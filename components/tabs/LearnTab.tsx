@@ -6,6 +6,7 @@ import { LearnedPattern } from "@/lib/types"
 import SkeletonCard from "@/components/ui/SkeletonCard"
 
 type Status = "idle" | "uploading" | "analyzing" | "done" | "error"
+type Mode = "image" | "url"
 
 const PATTERN_LABELS: { key: keyof LearnedPattern; label: string }[] = [
   { key: "headline_pattern", label: "헤드라인 패턴" },
@@ -16,9 +17,17 @@ const PATTERN_LABELS: { key: keyof LearnedPattern; label: string }[] = [
 ]
 
 export default function LearnTab() {
+  const [mode, setMode] = useState<Mode>("url")
+
+  // 이미지 모드
   const [files, setFiles] = useState<File[]>([])
   const [previews, setPreviews] = useState<string[]>([])
   const [dragging, setDragging] = useState(false)
+
+  // URL 모드
+  const [urlInput, setUrlInput] = useState("")
+  const [pageUrls, setPageUrls] = useState<string[]>([])
+
   const [status, setStatus] = useState<Status>("idle")
   const [error, setError] = useState<string | null>(null)
   const [latestPattern, setLatestPattern] = useState<LearnedPattern | null>(null)
@@ -44,6 +53,7 @@ export default function LearnTab() {
     return () => { mounted = false }
   }, [])
 
+  // ── 이미지 관련 ────────────────────────────────────────────
   const addFiles = useCallback(
     (newFiles: File[]) => {
       const imgs = newFiles.filter((f) => f.type.startsWith("image/"))
@@ -72,33 +82,73 @@ export default function LearnTab() {
     [addFiles]
   )
 
-  const handleAnalyze = async () => {
-    if (!files.length) return
+  // ── URL 관련 ────────────────────────────────────────────────
+  const addUrl = () => {
+    const url = urlInput.trim()
+    if (!url) return
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      setError("http:// 또는 https://로 시작하는 URL을 입력해주세요")
+      return
+    }
+    if (pageUrls.includes(url)) {
+      setError("이미 추가된 URL입니다")
+      return
+    }
+    if (pageUrls.length >= 5) {
+      setError("URL은 최대 5개까지 추가할 수 있습니다")
+      return
+    }
+    setPageUrls((prev) => [...prev, url])
+    setUrlInput("")
     setError(null)
-    setStatus("uploading")
+  }
+
+  const removeUrl = (idx: number) => setPageUrls((prev) => prev.filter((_, i) => i !== idx))
+
+  // ── 분석 ────────────────────────────────────────────────────
+  const handleAnalyze = async () => {
+    const isImageMode = mode === "image"
+    if (isImageMode && !files.length) return
+    if (!isImageMode && !pageUrls.length) return
+
+    setError(null)
+
+    const uploadedUrls: string[] = []
+
+    if (isImageMode) {
+      setStatus("uploading")
+      try {
+        const timestamp = Date.now()
+        await Promise.all(
+          files.map(async (file, idx) => {
+            const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_")
+            const path = `images/learn/${timestamp}-${idx}-${safeName}`
+            const { error: upErr } = await supabase.storage
+              .from("images")
+              .upload(path, file, { contentType: file.type })
+            if (upErr) throw new Error(`업로드 실패: ${upErr.message}`)
+            const { data: { publicUrl } } = supabase.storage.from("images").getPublicUrl(path)
+            uploadedUrls[idx] = publicUrl
+          })
+        )
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "업로드 실패")
+        setStatus("error")
+        return
+      }
+    }
+
+    setStatus("analyzing")
 
     try {
-      const timestamp = Date.now()
-      const uploadedUrls: string[] = []
+      const body = isImageMode
+        ? { imageUrls: uploadedUrls }
+        : { pageUrls }
 
-      await Promise.all(
-        files.map(async (file, idx) => {
-          const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_")
-          const path = `images/learn/${timestamp}-${idx}-${safeName}`
-          const { error: upErr } = await supabase.storage
-            .from("images")
-            .upload(path, file, { contentType: file.type })
-          if (upErr) throw new Error(`업로드 실패: ${upErr.message}`)
-          const { data: { publicUrl } } = supabase.storage.from("images").getPublicUrl(path)
-          uploadedUrls[idx] = publicUrl
-        })
-      )
-
-      setStatus("analyzing")
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageUrls: uploadedUrls }),
+        body: JSON.stringify(body),
       })
 
       if (!res.ok) {
@@ -125,83 +175,201 @@ export default function LearnTab() {
       setLatestPattern(saved)
       setHistory((prev) => [saved, ...prev].slice(0, 5))
       setStatus("done")
-      previews.forEach((u) => URL.revokeObjectURL(u))
-      setFiles([])
-      setPreviews([])
+
+      if (isImageMode) {
+        previews.forEach((u) => URL.revokeObjectURL(u))
+        setFiles([])
+        setPreviews([])
+      } else {
+        setPageUrls([])
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "오류 발생")
       setStatus("error")
     }
   }
 
-  const statusLabel =
-    status === "uploading"
-      ? "이미지 업로드 중..."
-      : status === "analyzing"
-      ? "AI 분석 중..."
-      : `분석 시작 (${files.length}장)`
+  const isBusy = status === "uploading" || status === "analyzing"
+  const canAnalyze = mode === "image" ? files.length > 0 : pageUrls.length > 0
+
+  const statusLabel = status === "uploading"
+    ? "이미지 업로드 중..."
+    : status === "analyzing"
+    ? "AI 분석 중..."
+    : mode === "image"
+    ? `분석 시작 (${files.length}장)`
+    : `분석 시작 (${pageUrls.length}개 URL)`
 
   return (
     <div className="space-y-5">
-      <div
-        className={`upload-zone p-8 text-center ${dragging ? "dragging" : ""}`}
-        onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={handleDrop}
-        onClick={() => fileInputRef.current?.click()}
-      >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={(e) => addFiles(Array.from(e.target.files || []))}
-        />
-        <div className="text-3xl mb-2">📸</div>
-        <p className="text-sm font-medium" style={{ color: "rgba(255,220,180,0.7)" }}>
-          경쟁사 상세페이지 스크린샷을 드래그하거나 클릭해서 업로드
-        </p>
-        <p className="text-xs mt-1" style={{ color: "rgba(255,220,180,0.35)" }}>
-          JPG, PNG 최대 10장
-        </p>
+      {/* 모드 탭 */}
+      <div className="flex gap-1 p-1 glass" style={{ borderRadius: "10px" }}>
+        {([
+          { id: "url" as Mode, icon: "🔗", label: "URL 입력" },
+          { id: "image" as Mode, icon: "📸", label: "스크린샷" },
+        ] as const).map((m) => (
+          <button
+            key={m.id}
+            onClick={() => { setMode(m.id); setError(null) }}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-medium transition-all duration-200"
+            style={{
+              background: mode === m.id ? "#f59e0b" : "transparent",
+              color: mode === m.id ? "#1a0e00" : "rgba(255,220,180,0.5)",
+            }}
+          >
+            <span>{m.icon}</span>
+            <span>{m.label}</span>
+          </button>
+        ))}
       </div>
 
-      {previews.length > 0 && (
-        <div className="glass-card p-4">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-medium" style={{ color: "rgba(255,220,180,0.7)" }}>
-              업로드 이미지 ({previews.length}/10)
+      {/* URL 입력 모드 */}
+      {mode === "url" && (
+        <div className="space-y-3">
+          <div className="glass-card p-4">
+            <p className="text-xs mb-3" style={{ color: "rgba(255,220,180,0.5)" }}>
+              스마트스토어 상품 페이지 URL을 입력하면 AI가 텍스트를 분석합니다 (최대 5개)
             </p>
-            <button
-              onClick={(e) => { e.stopPropagation(); previews.forEach((u) => URL.revokeObjectURL(u)); setFiles([]); setPreviews([]) }}
-              className="text-xs"
-              style={{ color: "rgba(255,220,180,0.35)", cursor: "pointer", background: "none", border: "none" }}
-            >
-              전체 제거
-            </button>
+            <div className="flex gap-2">
+              <input
+                className="glass-input"
+                placeholder="https://smartstore.naver.com/..."
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addUrl() } }}
+                style={{ flex: 1 }}
+              />
+              <button
+                className="btn-ghost"
+                onClick={addUrl}
+                style={{ flexShrink: 0 }}
+              >
+                추가
+              </button>
+            </div>
           </div>
-          <div className="img-grid">
-            {previews.map((url, i) => (
-              <div key={i} className="img-item">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt={`preview-${i}`} />
-                <button className="img-remove-btn" onClick={(e) => { e.stopPropagation(); removeFile(i) }}>×</button>
-              </div>
-            ))}
+
+          {pageUrls.length > 0 && (
+            <div className="glass-card p-4 space-y-2">
+              <p className="text-xs font-medium mb-2" style={{ color: "rgba(255,220,180,0.5)" }}>
+                분석할 URL ({pageUrls.length}/5)
+              </p>
+              {pageUrls.map((url, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-2 py-2 px-3 rounded-lg"
+                  style={{ background: "rgba(255,245,235,0.04)", border: "1px solid rgba(255,220,180,0.07)" }}
+                >
+                  <span className="text-xs" style={{ color: "rgba(245,158,11,0.6)", flexShrink: 0 }}>
+                    {i + 1}
+                  </span>
+                  <span
+                    className="text-xs flex-1 truncate"
+                    style={{ color: "rgba(255,245,235,0.6)" }}
+                    title={url}
+                  >
+                    {url}
+                  </span>
+                  <button
+                    onClick={() => removeUrl(i)}
+                    style={{
+                      background: "none", border: "none", cursor: "pointer",
+                      color: "rgba(255,220,180,0.3)", fontSize: 16, lineHeight: 1, flexShrink: 0,
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div
+            className="glass-card p-3"
+            style={{ borderColor: "rgba(255,220,180,0.05)", background: "rgba(255,245,235,0.02)" }}
+          >
+            <p className="text-xs" style={{ color: "rgba(255,220,180,0.3)", lineHeight: 1.6 }}>
+              💡 JS 렌더링 페이지(스마트스토어 상세 이미지)는 텍스트만 추출되므로
+              이미지 기반 분석보다 정확도가 낮을 수 있습니다.
+              상품 소개 텍스트가 풍부한 페이지일수록 분석이 정확합니다.
+            </p>
           </div>
         </div>
       )}
 
+      {/* 스크린샷 업로드 모드 */}
+      {mode === "image" && (
+        <div className="space-y-3">
+          <div
+            className={`upload-zone p-8 text-center ${dragging ? "dragging" : ""}`}
+            onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => addFiles(Array.from(e.target.files || []))}
+            />
+            <div className="text-3xl mb-2">📸</div>
+            <p className="text-sm font-medium" style={{ color: "rgba(255,220,180,0.7)" }}>
+              경쟁사 상세페이지 스크린샷을 드래그하거나 클릭해서 업로드
+            </p>
+            <p className="text-xs mt-1" style={{ color: "rgba(255,220,180,0.35)" }}>
+              JPG, PNG 최대 10장
+            </p>
+          </div>
+
+          {previews.length > 0 && (
+            <div className="glass-card p-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-medium" style={{ color: "rgba(255,220,180,0.7)" }}>
+                  업로드 이미지 ({previews.length}/10)
+                </p>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    previews.forEach((u) => URL.revokeObjectURL(u))
+                    setFiles([])
+                    setPreviews([])
+                  }}
+                  style={{ color: "rgba(255,220,180,0.35)", cursor: "pointer", background: "none", border: "none", fontSize: 12 }}
+                >
+                  전체 제거
+                </button>
+              </div>
+              <div className="img-grid">
+                {previews.map((url, i) => (
+                  <div key={i} className="img-item">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt={`preview-${i}`} />
+                    <button
+                      className="img-remove-btn"
+                      onClick={(e) => { e.stopPropagation(); removeFile(i) }}
+                    >×</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 분석 버튼 */}
       <button
         className="btn-primary w-full justify-center"
         onClick={handleAnalyze}
-        disabled={!files.length || status === "uploading" || status === "analyzing"}
+        disabled={!canAnalyze || isBusy}
       >
-        {(status === "uploading" || status === "analyzing") && <span className="spinner" />}
+        {isBusy && <span className="spinner" />}
         {statusLabel}
       </button>
 
+      {/* 에러 */}
       {error && (
         <div
           className="glass-card p-4"
@@ -218,6 +386,7 @@ export default function LearnTab() {
         </div>
       )}
 
+      {/* 완료 메시지 */}
       {status === "done" && (
         <div
           className="glass-card p-4"
@@ -227,9 +396,14 @@ export default function LearnTab() {
         </div>
       )}
 
+      {/* 분석 결과 */}
       <div>
         <p className="text-xs font-medium mb-3" style={{ color: "rgba(255,220,180,0.4)" }}>
-          {loadingHistory ? "분석 결과 불러오는 중..." : latestPattern ? "최근 분석 결과" : "아직 분석한 데이터가 없습니다"}
+          {loadingHistory
+            ? "분석 결과 불러오는 중..."
+            : latestPattern
+            ? "최근 분석 결과"
+            : "아직 분석한 데이터가 없습니다"}
         </p>
 
         {loadingHistory && (
@@ -254,7 +428,9 @@ export default function LearnTab() {
 
             {history.length > 1 && (
               <div className="mt-4">
-                <p className="text-xs mb-2" style={{ color: "rgba(255,220,180,0.3)" }}>이전 분석 ({history.length - 1}건)</p>
+                <p className="text-xs mb-2" style={{ color: "rgba(255,220,180,0.3)" }}>
+                  이전 분석 ({history.length - 1}건)
+                </p>
                 {history.slice(1).map((p) => (
                   <button
                     key={p.id}
@@ -264,7 +440,7 @@ export default function LearnTab() {
                   >
                     <p className="text-xs" style={{ color: "rgba(255,220,180,0.5)" }}>
                       {new Date(p.created_at).toLocaleDateString("ko-KR", {
-                        month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
+                        month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
                       })}
                     </p>
                     <p className="text-xs mt-1 truncate" style={{ color: "rgba(255,245,235,0.5)" }}>
