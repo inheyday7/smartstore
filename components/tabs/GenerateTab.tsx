@@ -40,7 +40,12 @@ export default function GenerateTab() {
         .from("products")
         .select("*")
         .order("created_at", { ascending: false })
-      if (mounted) { setProducts(data || []); setLoadingProducts(false) }
+      if (mounted) {
+        const prods = data || []
+        setProducts(prods)
+        if (prods.length > 0) setSelected(prods[0])
+        setLoadingProducts(false)
+      }
     })()
     return () => { mounted = false }
   }, [])
