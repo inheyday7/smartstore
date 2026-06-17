@@ -16,7 +16,12 @@ const PATTERN_LABELS: { key: keyof LearnedPattern; label: string }[] = [
   { key: "differentiation", label: "차별화 포인트" },
 ]
 
-export default function LearnTab() {
+interface Props {
+  pageUrls: string[]
+  setPageUrls: (urls: string[]) => void
+}
+
+export default function LearnTab({ pageUrls, setPageUrls }: Props) {
   const [mode, setMode] = useState<Mode>("url")
 
   // 이미지 모드
@@ -26,7 +31,6 @@ export default function LearnTab() {
 
   // URL 모드
   const [urlInput, setUrlInput] = useState("")
-  const [pageUrls, setPageUrls] = useState<string[]>([])
 
   const [status, setStatus] = useState<Status>("idle")
   const [error, setError] = useState<string | null>(null)
@@ -98,12 +102,12 @@ export default function LearnTab() {
       setError("URL은 최대 5개까지 추가할 수 있습니다")
       return
     }
-    setPageUrls((prev) => [...prev, url])
+    setPageUrls([...pageUrls, url])
     setUrlInput("")
     setError(null)
   }
 
-  const removeUrl = (idx: number) => setPageUrls((prev) => prev.filter((_, i) => i !== idx))
+  const removeUrl = (idx: number) => setPageUrls(pageUrls.filter((_, i) => i !== idx))
 
   // ── 분석 ────────────────────────────────────────────────────
   const handleAnalyze = async () => {

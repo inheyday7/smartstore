@@ -15,6 +15,7 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<TabId>("learn")
+  const [learnPageUrls, setLearnPageUrls] = useState<string[]>([])
 
   return (
     <main className="min-h-screen relative">
@@ -63,7 +64,9 @@ export default function Home() {
 
       <div className="relative z-10 px-4 sm:px-6 pb-16">
         <div className="max-w-2xl mx-auto">
-          {activeTab === "learn" && <LearnTab />}
+          {activeTab === "learn" && (
+            <LearnTab pageUrls={learnPageUrls} setPageUrls={setLearnPageUrls} />
+          )}
           {activeTab === "product" && <ProductTab />}
           {activeTab === "generate" && <GenerateTab />}
         </div>
