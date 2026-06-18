@@ -25,6 +25,8 @@ export async function withKeyRotation<T>(
       return await fn(new GoogleGenerativeAI(keys[i]))
     } catch (e) {
       lastError = e
+      const msg = e instanceof Error ? e.message : String(e)
+      console.error(`[gemini] key[${i}] 실패:`, msg)
       if (i < keys.length - 1) continue
     }
   }
