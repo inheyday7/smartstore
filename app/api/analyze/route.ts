@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
         .join("")
 
       const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash",
+        model: "gemini-2.0-flash",
         systemInstruction: URL_SYSTEM_PROMPT,
       })
 
@@ -143,7 +143,7 @@ export async function POST(req: NextRequest) {
 
     // ── 이미지 모드 ────────────────────────────────────────────
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.0-flash",
       systemInstruction: IMAGE_SYSTEM_PROMPT,
     })
 
