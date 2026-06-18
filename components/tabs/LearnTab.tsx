@@ -86,6 +86,24 @@ export default function LearnTab({ pageUrls, setPageUrls }: Props) {
     [addFiles]
   )
 
+  useEffect(() => {
+    if (mode !== "image") return
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items
+      if (!items) return
+      const imageFiles: File[] = []
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile()
+          if (file) imageFiles.push(file)
+        }
+      }
+      if (imageFiles.length > 0) addFiles(imageFiles)
+    }
+    document.addEventListener("paste", handlePaste)
+    return () => document.removeEventListener("paste", handlePaste)
+  }, [mode, addFiles])
+
   // ── URL 관련 ────────────────────────────────────────────────
   const addUrl = () => {
     const url = urlInput.trim()
@@ -321,9 +339,19 @@ export default function LearnTab({ pageUrls, setPageUrls }: Props) {
             />
             <div className="text-3xl mb-2">📸</div>
             <p className="text-sm font-medium" style={{ color: "rgba(255,220,180,0.7)" }}>
-              경쟁사 상세페이지 스크린샷을 드래그하거나 클릭해서 업로드
+              드래그하거나 클릭해서 업로드
             </p>
-            <p className="text-xs mt-1" style={{ color: "rgba(255,220,180,0.35)" }}>
+            <p className="text-xs mt-1.5" style={{ color: "rgba(255,220,180,0.45)" }}>
+              또는 <kbd style={{
+                background: "rgba(255,220,180,0.1)",
+                border: "1px solid rgba(255,220,180,0.2)",
+                borderRadius: 4,
+                padding: "1px 5px",
+                fontSize: 11,
+                fontFamily: "monospace",
+              }}>Ctrl+V</kbd> 로 클립보드 이미지 붙여넣기
+            </p>
+            <p className="text-xs mt-1" style={{ color: "rgba(255,220,180,0.25)" }}>
               JPG, PNG 최대 10장
             </p>
           </div>
