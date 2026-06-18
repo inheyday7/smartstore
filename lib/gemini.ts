@@ -11,6 +11,8 @@ function getApiKeys(): string[] {
     process.env.GOOGLE_API_KEY,
     process.env.GOOGLE_API_KEY_2,
     process.env.GOOGLE_API_KEY_3,
+    process.env.GOOGLE_API_KEY_4,
+    process.env.GOOGLE_API_KEY_5,
   ].filter(Boolean) as string[]
 }
 
