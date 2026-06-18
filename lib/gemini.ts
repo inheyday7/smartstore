@@ -19,14 +19,18 @@ export async function withKeyRotation<T>(
   const keys = getApiKeys()
   if (keys.length === 0) throw new Error("GOOGLE_API_KEY가 설정되지 않았습니다")
 
+  let lastError: unknown
   for (let i = 0; i < keys.length; i++) {
     try {
       return await fn(new GoogleGenerativeAI(keys[i]))
     } catch (e) {
-      if (isRateLimitError(e) && i < keys.length - 1) continue
-      throw e
+      lastError = e
+      if (i < keys.length - 1) continue
     }
   }
 
-  throw new Error("모든 API 키의 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요")
+  if (isRateLimitError(lastError)) {
+    throw new Error("모든 API 키의 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요")
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError))
 }
