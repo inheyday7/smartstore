@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { GoogleGenerativeAI } from "@google/generative-ai"
+import { withKeyRotation } from "@/lib/gemini"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 60
@@ -104,8 +104,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "이미지 또는 URL을 입력해주세요" }, { status: 400 })
     }
 
-    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!)
-
     // ── URL 모드 ──────────────────────────────────────────────
     if (hasPages && !hasImages) {
       const pages = await Promise.allSettled(
@@ -125,28 +123,21 @@ export async function POST(req: NextRequest) {
         .map((p, i) => `\n\n=== 상품 ${i + 1} (${p.title}) ===\n${p.text}`)
         .join("")
 
-      const model = genAI.getGenerativeModel({
-        model: "gemini-2.0-flash",
-        systemInstruction: URL_SYSTEM_PROMPT,
+      const parsed = await withKeyRotation(async (genAI) => {
+        const model = genAI.getGenerativeModel({
+          model: "gemini-2.0-flash",
+          systemInstruction: URL_SYSTEM_PROMPT,
+        })
+        const result = await model.generateContent([
+          { text: `아래는 베이커리 스마트스토어 상품 페이지 ${successPages.length}개의 텍스트 내용입니다. 분석해서 JSON으로 패턴을 추출해주세요.\n${combinedText}` },
+        ])
+        return extractJson(result.response.text())
       })
 
-      const result = await model.generateContent([
-        {
-          text: `아래는 베이커리 스마트스토어 상품 페이지 ${successPages.length}개의 텍스트 내용입니다. 분석해서 JSON으로 패턴을 추출해주세요.\n${combinedText}`,
-        },
-      ])
-
-      const text = result.response.text()
-      const parsed = extractJson(text)
       return NextResponse.json(parsed)
     }
 
     // ── 이미지 모드 ────────────────────────────────────────────
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash",
-      systemInstruction: IMAGE_SYSTEM_PROMPT,
-    })
-
     const imageParts = await Promise.all(
       imageUrls!.slice(0, 10).map(async (url: string) => {
         const res = await fetch(url)
@@ -161,13 +152,18 @@ export async function POST(req: NextRequest) {
       })
     )
 
-    const result = await model.generateContent([
-      ...imageParts,
-      { text: "위 베이커리 상세페이지 이미지들을 분석해서 JSON으로 패턴을 추출해주세요." },
-    ])
+    const parsed = await withKeyRotation(async (genAI) => {
+      const model = genAI.getGenerativeModel({
+        model: "gemini-2.0-flash",
+        systemInstruction: IMAGE_SYSTEM_PROMPT,
+      })
+      const result = await model.generateContent([
+        ...imageParts,
+        { text: "위 베이커리 상세페이지 이미지들을 분석해서 JSON으로 패턴을 추출해주세요." },
+      ])
+      return extractJson(result.response.text())
+    })
 
-    const text = result.response.text()
-    const parsed = extractJson(text)
     return NextResponse.json(parsed)
   } catch (e) {
     const message = e instanceof Error ? e.message : "서버 오류"

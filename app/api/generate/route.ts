@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { GoogleGenerativeAI } from "@google/generative-ai"
+import { withKeyRotation } from "@/lib/gemini"
 import { Product, LearnedPattern } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
@@ -63,12 +63,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "상품 정보가 없습니다" }, { status: 400 })
     }
 
-    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!)
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash",
-      systemInstruction: buildSystemPrompt(learnedPatterns, tone),
-    })
-
     const imageParts: { inlineData: { data: string; mimeType: string } }[] = []
 
     if (product.image_urls?.length > 0) {
@@ -96,13 +90,17 @@ export async function POST(req: NextRequest) {
 
 위 상품의 스마트스토어 베이커리 상세페이지 카피를 JSON으로 작성해주세요.`
 
-    const result = await model.generateContent([
-      ...imageParts,
-      { text: userText },
-    ])
-
-    const text = result.response.text()
-    const parsed = extractJson(text)
+    const parsed = await withKeyRotation(async (genAI) => {
+      const model = genAI.getGenerativeModel({
+        model: "gemini-2.0-flash",
+        systemInstruction: buildSystemPrompt(learnedPatterns, tone),
+      })
+      const result = await model.generateContent([
+        ...imageParts,
+        { text: userText },
+      ])
+      return extractJson(result.response.text())
+    })
 
     return NextResponse.json(parsed)
   } catch (e) {
