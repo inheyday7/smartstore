@@ -124,6 +124,7 @@ export async function POST(req: NextRequest) {
         .join("")
 
       const parsed = await withKeyRotation(async (genAI, modelName) => {
+        console.log(`[route/analyze] getGenerativeModel 호출: ${modelName}`)
         const model = genAI.getGenerativeModel({
           model: modelName,
           systemInstruction: URL_SYSTEM_PROMPT,
