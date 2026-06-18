@@ -123,9 +123,9 @@ export async function POST(req: NextRequest) {
         .map((p, i) => `\n\n=== 상품 ${i + 1} (${p.title}) ===\n${p.text}`)
         .join("")
 
-      const parsed = await withKeyRotation(async (genAI) => {
+      const parsed = await withKeyRotation(async (genAI, modelName) => {
         const model = genAI.getGenerativeModel({
-          model: "gemini-2.0-flash",
+          model: modelName,
           systemInstruction: URL_SYSTEM_PROMPT,
         })
         const result = await model.generateContent([

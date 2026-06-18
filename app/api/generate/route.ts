@@ -90,9 +90,9 @@ export async function POST(req: NextRequest) {
 
 위 상품의 스마트스토어 베이커리 상세페이지 카피를 JSON으로 작성해주세요.`
 
-    const parsed = await withKeyRotation(async (genAI) => {
+    const parsed = await withKeyRotation(async (genAI, modelName) => {
       const model = genAI.getGenerativeModel({
-        model: "gemini-2.0-flash",
+        model: modelName,
         systemInstruction: buildSystemPrompt(learnedPatterns, tone),
       })
       const result = await model.generateContent([
