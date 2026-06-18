@@ -31,10 +31,8 @@ export async function withKeyRotation<T>(
 
   for (let ki = 0; ki < keys.length; ki++) {
     const genAI = new GoogleGenerativeAI(keys[ki])
-    let keyRateLimited = false
 
     for (const modelName of FALLBACK_MODELS) {
-      if (keyRateLimited) break
       try {
         return await fn(genAI, modelName)
       } catch (e) {
@@ -42,11 +40,8 @@ export async function withKeyRotation<T>(
         const msg = e instanceof Error ? e.message : String(e)
         console.error(`[gemini] key[${ki}]/${modelName} 실패:`, msg.slice(0, 200))
 
-        if (isRateLimitError(e)) {
-          keyRateLimited = true
-          break
-        }
-        // 404(모델 없음), 503(서버 과부하), 기타 → 다음 모델 시도
+        // 429: 이 모델만 한도 초과 → 다음 모델 시도 (모델별 한도는 독립적)
+        // 404, 503, 기타 → 다음 모델 시도
       }
     }
 
