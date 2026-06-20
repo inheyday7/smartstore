@@ -23,7 +23,7 @@ function buildSystemPrompt(learnedPatterns: LearnedPattern | null, tone: string)
 `
     : ""
 
-  return `당신은 한국 스마트스토어 베이커리 전문 카피라이터입니다.
+  return `당신은 한국 스마트스토어 베이커리 전문 카피라이터 겸 HTML 디자이너입니다.
 작성 톤: ${TONE_MAP[tone] || TONE_MAP.emotional}
 
 [베이커리 상세페이지 기본 패턴]
@@ -41,7 +41,7 @@ ${patternSection}
   "ingredients": "재료 및 원산지 설명",
   "storage": "보관법과 배송 안내",
   "cta": "구매 유도 CTA 문구",
-  "htmlFull": "위 6개 섹션을 합친 완성 HTML. 인라인 스타일로 스마트스토어에 바로 붙여넣기 가능한 형태. 배경색 적용 포함."
+  "htmlFull": "스마트스토어 상세페이지 완성 HTML. 아래 규칙을 반드시 따를 것:\\n1. 전체를 <div style='max-width:860px;margin:0 auto;font-family:Apple SD Gothic Neo,Noto Sans KR,sans-serif;'>으로 감쌀 것\\n2. 섹션 구성 (순서대로): ①브랜드헤더 ②메인이미지들 ③감성소개 ④핵심특장점3개 ⑤재료원산지 ⑥보관배송 ⑦CTA\\n3. ①브랜드헤더: 배경흰색, 상품명을 영문+한글 2줄로 크게(font-size 48~64px, font-weight:900), 서브카피 작게, 패딩 60px\\n4. ②메인이미지: 제공된 이미지URL을 <img>태그로 삽입(width:100%, display:block), 이미지 없으면 배경색 박스로 대체\\n5. ③감성소개: 배경 #f9f5f0, 텍스트 중앙정렬, font-size 16px, line-height 2, 패딩 60px 40px\\n6. ④핵심특장점: 3개를 가로 배치(display:flex), 각각 아이콘이모지+제목+설명, 배경 브랜드컬러 또는 어두운색, 텍스트 흰색\\n7. ⑤재료원산지: 배경 흰색, 좌측 큰 숫자나 이모지 포인트, 재료명 굵게\\n8. ⑥보관배송: 배경 #f0f0f0, 아이콘이모지와 함께 간결하게\\n9. ⑦CTA: 배경 어두운색(#1a1a1a 또는 브랜드컬러), 텍스트 흰색, 큰 폰트, 해시태그 3~5개 포함\\n10. 모든 스타일은 인라인으로, 외부 CSS/JS 없이, 줄바꿈 없이 한 줄로"
 }`
 }
 
@@ -84,9 +84,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const imageUrlList = product.image_urls?.slice(0, 4) ?? []
     const userText = `상품명: ${product.name}
 브랜드 컬러: ${product.bg_color}
 핵심 특징: ${product.features.join(", ")}
+상품 이미지 URL (htmlFull의 <img src="">에 그대로 사용):
+${imageUrlList.length > 0 ? imageUrlList.map((u, i) => `이미지${i + 1}: ${u}`).join("\n") : "이미지 없음"}
 
 위 상품의 스마트스토어 베이커리 상세페이지 카피를 JSON으로 작성해주세요.`
 
