@@ -292,22 +292,20 @@ export default function GenerateTab({ generating, setGenerating, result, setResu
 
           <div className="result-section">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-semibold" style={{ color: "rgba(245,158,11,0.8)" }}>완성 HTML</p>
+              <p className="text-xs font-semibold" style={{ color: "rgba(245,158,11,0.8)" }}>완성 HTML 미리보기</p>
               <CopyButton text={result.htmlFull} label="HTML 복사" />
             </div>
-            <pre
-              className="text-xs overflow-x-auto"
+            <iframe
+              srcDoc={result.htmlFull}
               style={{
-                color: "rgba(255,245,235,0.45)",
-                lineHeight: 1.5,
-                maxHeight: 160,
-                overflowY: "auto",
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-all",
+                width: "100%",
+                minHeight: 600,
+                border: "none",
+                borderRadius: 8,
+                background: "#fff",
               }}
-            >
-              {result.htmlFull}
-            </pre>
+              sandbox="allow-same-origin"
+            />
           </div>
         </div>
       )}
