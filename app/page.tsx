@@ -4,14 +4,16 @@ import { useState, useRef } from "react"
 import LearnTab from "@/components/tabs/LearnTab"
 import ProductTab from "@/components/tabs/ProductTab"
 import GenerateTab from "@/components/tabs/GenerateTab"
+import HistoryTab from "@/components/tabs/HistoryTab"
 import type { GenerateResult } from "@/lib/types"
 
-type TabId = "learn" | "product" | "generate"
+type TabId = "learn" | "product" | "generate" | "history"
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: "learn", label: "학습", icon: "🧠" },
   { id: "product", label: "상품 관리", icon: "📦" },
   { id: "generate", label: "생성", icon: "✨" },
+  { id: "history", label: "보관함", icon: "🗂️" },
 ]
 
 export default function Home() {
@@ -84,6 +86,7 @@ export default function Home() {
               abortRef={generateAbortRef}
             />
           )}
+          {activeTab === "history" && <HistoryTab />}
         </div>
       </div>
 

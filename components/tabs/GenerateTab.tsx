@@ -91,6 +91,12 @@ export default function GenerateTab({ generating, setGenerating, result, setResu
 
       const generated: GenerateResult = await res.json()
       setResult(generated)
+      await supabase.from("generated_pages").insert({
+        product_name: selected.name,
+        tone,
+        result: generated,
+        html: generated.htmlFull,
+      })
     } catch (e) {
       if (e instanceof Error && e.name === "AbortError") return
       setError(e instanceof Error ? e.message : "오류 발생")

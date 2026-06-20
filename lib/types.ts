@@ -26,3 +26,12 @@ export interface GenerateResult {
   cta: string
   htmlFull: string
 }
+
+export interface SavedPage {
+  id: string
+  product_name: string
+  tone: string
+  result: GenerateResult
+  html: string
+  created_at: string
+}
