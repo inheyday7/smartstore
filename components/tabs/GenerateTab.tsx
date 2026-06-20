@@ -111,6 +111,13 @@ export default function GenerateTab({ generating, setGenerating, result, setResu
     return val as string
   }
 
+  const handleOpenPreview = () => {
+    if (!result) return
+    const blob = new Blob([result.htmlFull], { type: "text/html" })
+    const url = URL.createObjectURL(blob)
+    window.open(url, "_blank")
+  }
+
   const handleDownloadPDF = () => {
     if (!result) return
     const win = window.open("", "_blank")
@@ -290,6 +297,12 @@ export default function GenerateTab({ generating, setGenerating, result, setResu
                   <path d="M23 4v6h-6M1 20v-6h6" /><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
                 </svg>
                 재생성
+              </button>
+              <button className="btn-ghost" onClick={handleOpenPreview}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
+                </svg>
+                새 탭
               </button>
               <button className="btn-ghost" onClick={handleDownloadImage}>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
