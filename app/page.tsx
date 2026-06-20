@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import LearnTab from "@/components/tabs/LearnTab"
 import ProductTab from "@/components/tabs/ProductTab"
 import GenerateTab from "@/components/tabs/GenerateTab"
+import type { GenerateResult } from "@/lib/types"
 
 type TabId = "learn" | "product" | "generate"
 
@@ -16,6 +17,10 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
 export default function Home() {
   const [activeTab, setActiveTab] = useState<TabId>("learn")
   const [learnPageUrls, setLearnPageUrls] = useState<string[]>([])
+  const [generating, setGenerating] = useState(false)
+  const [generateResult, setGenerateResult] = useState<GenerateResult | null>(null)
+  const [generateError, setGenerateError] = useState<string | null>(null)
+  const generateAbortRef = useRef<AbortController | null>(null)
 
   return (
     <main className="min-h-screen relative">
@@ -68,7 +73,17 @@ export default function Home() {
             <LearnTab pageUrls={learnPageUrls} setPageUrls={setLearnPageUrls} />
           )}
           {activeTab === "product" && <ProductTab />}
-          {activeTab === "generate" && <GenerateTab />}
+          {activeTab === "generate" && (
+            <GenerateTab
+              generating={generating}
+              setGenerating={setGenerating}
+              result={generateResult}
+              setResult={setGenerateResult}
+              error={generateError}
+              setError={setGenerateError}
+              abortRef={generateAbortRef}
+            />
+          )}
         </div>
       </div>
 

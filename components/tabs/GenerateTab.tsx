@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, type Dispatch, type SetStateAction } from "react"
 import { supabase } from "@/lib/supabase"
 import { Product, LearnedPattern, GenerateResult } from "@/lib/types"
 import ProductCard from "@/components/ProductCard"
@@ -24,14 +24,21 @@ const SECTIONS: { key: keyof GenerateResult; label: string }[] = [
   { key: "cta", label: "구매 유도 CTA" },
 ]
 
-export default function GenerateTab() {
+interface Props {
+  generating: boolean
+  setGenerating: Dispatch<SetStateAction<boolean>>
+  result: GenerateResult | null
+  setResult: Dispatch<SetStateAction<GenerateResult | null>>
+  error: string | null
+  setError: Dispatch<SetStateAction<string | null>>
+  abortRef: { current: AbortController | null }
+}
+
+export default function GenerateTab({ generating, setGenerating, result, setResult, error, setError, abortRef }: Props) {
   const [products, setProducts] = useState<Product[]>([])
   const [loadingProducts, setLoadingProducts] = useState(true)
   const [selected, setSelected] = useState<Product | null>(null)
   const [tone, setTone] = useState<Tone>("emotional")
-  const [generating, setGenerating] = useState(false)
-  const [result, setResult] = useState<GenerateResult | null>(null)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let mounted = true
@@ -52,6 +59,9 @@ export default function GenerateTab() {
 
   const handleGenerate = async () => {
     if (!selected) return
+    const controller = new AbortController()
+    abortRef.current = controller
+
     setGenerating(true)
     setError(null)
     setResult(null)
@@ -70,6 +80,7 @@ export default function GenerateTab() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ product: selected, tone, learnedPatterns }),
+        signal: controller.signal,
       })
 
       if (!res.ok) {
@@ -80,10 +91,16 @@ export default function GenerateTab() {
       const generated: GenerateResult = await res.json()
       setResult(generated)
     } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") return
       setError(e instanceof Error ? e.message : "오류 발생")
     } finally {
       setGenerating(false)
     }
+  }
+
+  const handleStop = () => {
+    abortRef.current?.abort()
+    setGenerating(false)
   }
 
   const getSectionText = (key: keyof GenerateResult): string => {
@@ -180,15 +197,35 @@ export default function GenerateTab() {
         </div>
       </div>
 
-      <button
-        className="btn-primary w-full justify-center"
-        onClick={handleGenerate}
-        disabled={!selected || generating}
-        style={{ fontSize: 15, padding: "14px 24px" }}
-      >
-        {generating && <span className="spinner" />}
-        {generating ? "생성 중..." : "상세페이지 생성"}
-      </button>
+      <div className="flex gap-2">
+        <button
+          className="btn-primary flex-1 justify-center"
+          onClick={handleGenerate}
+          disabled={!selected || generating}
+          style={{ fontSize: 15, padding: "14px 24px" }}
+        >
+          {generating && <span className="spinner" />}
+          {generating ? "생성 중..." : "상세페이지 생성"}
+        </button>
+        {generating && (
+          <button
+            onClick={handleStop}
+            style={{
+              padding: "14px 18px",
+              borderRadius: 10,
+              border: "1px solid rgba(239,68,68,0.35)",
+              background: "rgba(239,68,68,0.08)",
+              color: "rgb(248,113,113)",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          >
+            중단
+          </button>
+        )}
+      </div>
 
       {error && (
         <div
