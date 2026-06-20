@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, type Dispatch, type SetStateAction } from "react"
+import { useState, useEffect, useRef, type Dispatch, type SetStateAction } from "react"
+import html2canvas from "html2canvas"
 import { supabase } from "@/lib/supabase"
 import { Product, LearnedPattern, GenerateResult } from "@/lib/types"
 import ProductCard from "@/components/ProductCard"
@@ -108,6 +109,36 @@ export default function GenerateTab({ generating, setGenerating, result, setResu
     const val = result[key]
     if (Array.isArray(val)) return val.map((v, i) => `${i + 1}. ${v}`).join("\n")
     return val as string
+  }
+
+  const handleDownloadPDF = () => {
+    if (!result) return
+    const win = window.open("", "_blank")
+    if (!win) return
+    win.document.write(result.htmlFull)
+    win.document.close()
+    setTimeout(() => win.print(), 500)
+  }
+
+  const downloadContainerRef = useRef<HTMLDivElement | null>(null)
+
+  const handleDownloadImage = async () => {
+    if (!result) return
+    const container = document.createElement("div")
+    container.style.cssText = "position:fixed;left:-9999px;top:0;width:860px;background:#fff;"
+    container.innerHTML = result.htmlFull
+    document.body.appendChild(container)
+    downloadContainerRef.current = container
+    try {
+      const canvas = await html2canvas(container, { useCORS: true, scale: 1.5, logging: false })
+      const link = document.createElement("a")
+      link.download = `${selected?.name || "상세페이지"}.png`
+      link.href = canvas.toDataURL("image/png")
+      link.click()
+    } finally {
+      document.body.removeChild(container)
+      downloadContainerRef.current = null
+    }
   }
 
   if (loadingProducts) {
@@ -253,14 +284,26 @@ export default function GenerateTab({ generating, setGenerating, result, setResu
         <div className="space-y-4 fade-in-up">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold" style={{ color: "rgba(255,220,180,0.7)" }}>생성 결과</p>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap justify-end">
               <button className="btn-ghost" onClick={handleGenerate}>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M23 4v6h-6M1 20v-6h6" /><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
                 </svg>
                 재생성
               </button>
-              <CopyButton text={result.htmlFull} label="HTML 전체 복사" />
+              <button className="btn-ghost" onClick={handleDownloadImage}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                PNG
+              </button>
+              <button className="btn-ghost" onClick={handleDownloadPDF}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" />
+                </svg>
+                PDF
+              </button>
+              <CopyButton text={result.htmlFull} label="HTML" />
             </div>
           </div>
 
