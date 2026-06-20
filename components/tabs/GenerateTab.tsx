@@ -111,9 +111,12 @@ export default function GenerateTab({ generating, setGenerating, result, setResu
     return val as string
   }
 
+  const wrapHtml = (inner: string) =>
+    `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0">${inner}</body></html>`
+
   const handleOpenPreview = () => {
     if (!result) return
-    const blob = new Blob([result.htmlFull], { type: "text/html" })
+    const blob = new Blob([wrapHtml(result.htmlFull)], { type: "text/html;charset=utf-8" })
     const url = URL.createObjectURL(blob)
     window.open(url, "_blank")
   }
@@ -122,7 +125,7 @@ export default function GenerateTab({ generating, setGenerating, result, setResu
     if (!result) return
     const win = window.open("", "_blank")
     if (!win) return
-    win.document.write(result.htmlFull)
+    win.document.write(wrapHtml(result.htmlFull))
     win.document.close()
     setTimeout(() => win.print(), 500)
   }
