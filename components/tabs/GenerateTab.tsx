@@ -40,6 +40,8 @@ export default function GenerateTab({ generating, setGenerating, result, setResu
   const [loadingProducts, setLoadingProducts] = useState(true)
   const [selected, setSelected] = useState<Product | null>(null)
   const [tone, setTone] = useState<Tone>("emotional")
+  const [editingKey, setEditingKey] = useState<keyof GenerateResult | null>(null)
+  const [editDraft, setEditDraft] = useState<string>("")
 
   useEffect(() => {
     let mounted = true
@@ -115,6 +117,30 @@ export default function GenerateTab({ generating, setGenerating, result, setResu
     const val = result[key]
     if (Array.isArray(val)) return val.map((v, i) => `${i + 1}. ${v}`).join("\n")
     return val as string
+  }
+
+  const startEdit = (key: keyof GenerateResult) => {
+    setEditingKey(key)
+    setEditDraft(getSectionText(key))
+  }
+
+  const saveEdit = (key: keyof GenerateResult) => {
+    if (!result) return
+    if (key === "features") {
+      const arr = editDraft
+        .split("\n")
+        .map((l) => l.replace(/^\d+\.\s*/, "").trim())
+        .filter(Boolean)
+      setResult({ ...result, features: arr })
+    } else {
+      setResult({ ...result, [key]: editDraft })
+    }
+    setEditingKey(null)
+  }
+
+  const cancelEdit = () => {
+    setEditingKey(null)
+    setEditDraft("")
   }
 
   const wrapHtml = (inner: string) =>
@@ -333,9 +359,64 @@ export default function GenerateTab({ generating, setGenerating, result, setResu
             <div key={key} className="result-section">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-xs font-semibold" style={{ color: "rgba(245,158,11,0.8)" }}>{label}</p>
-                <CopyButton text={getSectionText(key)} />
+                <div className="flex items-center gap-1.5">
+                  {editingKey !== key && <CopyButton text={getSectionText(key)} />}
+                  {editingKey === key ? (
+                    <>
+                      <button
+                        onClick={() => saveEdit(key)}
+                        style={{
+                          fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "none",
+                          background: "#f59e0b", color: "#1a0e00", fontWeight: 700, cursor: "pointer",
+                        }}
+                      >
+                        저장
+                      </button>
+                      <button
+                        onClick={cancelEdit}
+                        style={{
+                          fontSize: 11, padding: "3px 8px", borderRadius: 6,
+                          border: "1px solid rgba(255,220,180,0.15)", background: "transparent",
+                          color: "rgba(255,220,180,0.45)", cursor: "pointer",
+                        }}
+                      >
+                        취소
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => startEdit(key)}
+                      title="편집"
+                      style={{
+                        display: "flex", alignItems: "center", gap: 3,
+                        fontSize: 11, padding: "3px 8px", borderRadius: 6,
+                        border: "1px solid rgba(255,220,180,0.15)", background: "transparent",
+                        color: "rgba(255,220,180,0.45)", cursor: "pointer",
+                      }}
+                    >
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                      </svg>
+                      편집
+                    </button>
+                  )}
+                </div>
               </div>
-              {key === "features" && Array.isArray(result.features) ? (
+
+              {editingKey === key ? (
+                <textarea
+                  value={editDraft}
+                  onChange={(e) => setEditDraft(e.target.value)}
+                  autoFocus
+                  className="glass-input"
+                  style={{
+                    width: "100%", minHeight: key === "features" ? 100 : key === "headline" ? 72 : 80,
+                    resize: "vertical", fontSize: 13, lineHeight: 1.7,
+                    color: "rgba(255,245,235,0.9)", fontFamily: "inherit",
+                  }}
+                />
+              ) : key === "features" && Array.isArray(result.features) ? (
                 <ul className="space-y-1.5">
                   {result.features.map((f: string, i: number) => (
                     <li key={i} className="flex items-start gap-2 text-sm" style={{ color: "rgba(255,245,235,0.8)" }}>
