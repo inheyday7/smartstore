@@ -32,6 +32,16 @@ function buildSystemPrompt(learnedPatterns: LearnedPattern | null, tone: string)
 - 스토리: 매일 굽는다, 직접 만든다는 수제 이미지
 - 보관법: 베이커리 필수 항목 (실온/냉동, 해동법)
 - CTA: 선물·특별한 날 연결로 구매 동기 자극
+
+[이미지 분류 및 섹션 배치]
+제공된 이미지들을 시각적으로 분석하여 아래 기준으로 분류하고, htmlFull 내 해당 섹션에 배치하세요:
+- 제품 전체샷/대표컷 → ②메인이미지 섹션 (가장 먼저 표시)
+- 단면/식감/텍스처 컷 → ④핵심특장점 섹션 내 관련 항목 하단
+- 재료/원재료/산지 컷 → ⑤재료원산지 섹션 내 삽입
+- 포장/박스/배송 컷 → ⑥보관배송 섹션 내 삽입
+- 라이프스타일/연출/감성 컷 → ③감성소개 또는 ⑦CTA 섹션
+- 분류 불명확한 이미지 → ②메인이미지에 포함
+이미지가 없는 섹션은 텍스트만으로 구성하세요.
 ${patternSection}
 반드시 JSON으로만 응답 (다른 텍스트 없이):
 {
@@ -41,7 +51,7 @@ ${patternSection}
   "ingredients": "재료 및 원산지 설명",
   "storage": "보관법과 배송 안내",
   "cta": "구매 유도 CTA 문구",
-  "htmlFull": "스마트스토어 상세페이지 완성 HTML. 아래 규칙을 반드시 따를 것:\\n1. 전체를 <div style='max-width:860px;margin:0 auto;font-family:Apple SD Gothic Neo,Noto Sans KR,sans-serif;'>으로 감쌀 것\\n2. 섹션 구성 (순서대로): ①브랜드헤더 ②메인이미지들 ③감성소개 ④핵심특장점3개 ⑤재료원산지 ⑥보관배송 ⑦CTA\\n3. ①브랜드헤더: 배경흰색, 상품명을 영문+한글 2줄로 크게(font-size 48~64px, font-weight:900), 서브카피 작게, 패딩 60px\\n4. ②메인이미지: 제공된 이미지URL을 <img>태그로 삽입(width:100%, display:block), 이미지 없으면 배경색 박스로 대체\\n5. ③감성소개: 배경 #f9f5f0, 텍스트 중앙정렬, font-size 16px, line-height 2, 패딩 60px 40px\\n6. ④핵심특장점: 3개를 가로 배치(display:flex), 각각 아이콘이모지+제목+설명, 배경 브랜드컬러 또는 어두운색, 텍스트 흰색\\n7. ⑤재료원산지: 배경 흰색, 좌측 큰 숫자나 이모지 포인트, 재료명 굵게\\n8. ⑥보관배송: 배경 #f0f0f0, 아이콘이모지와 함께 간결하게\\n9. ⑦CTA: 배경 어두운색(#1a1a1a 또는 브랜드컬러), 텍스트 흰색, 큰 폰트, 해시태그 3~5개 포함\\n10. 모든 스타일은 인라인으로, 외부 CSS/JS 없이, 줄바꿈 없이 한 줄로"
+  "htmlFull": "스마트스토어 상세페이지 완성 HTML. 규칙:\\n1. 전체를 <div style='max-width:860px;margin:0 auto;font-family:Apple SD Gothic Neo,Noto Sans KR,sans-serif;'>으로 감쌀 것\\n2. 섹션 구성: ①브랜드헤더 ②메인이미지 ③감성소개 ④핵심특장점3개 ⑤재료원산지 ⑥보관배송 ⑦CTA\\n3. ①: 배경흰색, 상품명 영문+한글 크게(48~64px,900), 서브카피 작게, 패딩 60px\\n4. ②: 분류상 '제품 전체샷/대표컷'인 이미지 URL을 <img style='width:100%;display:block'>으로 삽입. 없으면 배경색 박스 대체\\n5. ③: 배경 #f9f5f0, 중앙정렬 16px line-height:2, 패딩 60px 40px. '라이프스타일/감성' 이미지가 있으면 섹션 상단에 width:100% 삽입\\n6. ④: 3개 flex 배치, 이모지+제목+설명, 브랜드컬러 배경, 흰텍스트. '단면/식감/텍스처' 이미지가 있으면 관련 카드 하단에 width:100% 삽입\\n7. ⑤: 흰배경, 이모지 포인트, 재료명 굵게. '재료/원재료' 이미지가 있으면 섹션 내 width:100% 삽입\\n8. ⑥: #f0f0f0 배경, 이모지+간결한 설명. '포장/박스/배송' 이미지가 있으면 섹션 내 width:100% 삽입\\n9. ⑦: 어두운배경(#1a1a1a 또는 브랜드컬러), 흰텍스트, 큰폰트, 해시태그 3~5개\\n10. 모든 스타일 인라인, 외부 CSS/JS 없이, 한 줄로"
 }`
 }
 
@@ -67,7 +77,7 @@ export async function POST(req: NextRequest) {
 
     if (product.image_urls?.length > 0) {
       const results = await Promise.allSettled(
-        product.image_urls.slice(0, 4).map(async (url) => {
+        product.image_urls.slice(0, 8).map(async (url) => {
           const res = await fetch(url)
           if (!res.ok) throw new Error(`fetch 실패: ${url}`)
           const buf = await res.arrayBuffer()
@@ -84,14 +94,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const imageUrlList = product.image_urls?.slice(0, 4) ?? []
+    const imageUrlList = product.image_urls?.slice(0, 8) ?? []
     const userText = `상품명: ${product.name}
 브랜드 컬러: ${product.bg_color}
 핵심 특징: ${product.features.join(", ")}
-상품 이미지 URL (htmlFull의 <img src="">에 그대로 사용):
+상품 이미지 URL (총 ${imageUrlList.length}장 — 각 이미지를 분석해 분류하고 해당 섹션에 배치하세요):
 ${imageUrlList.length > 0 ? imageUrlList.map((u, i) => `이미지${i + 1}: ${u}`).join("\n") : "이미지 없음"}
 
-위 상품의 스마트스토어 베이커리 상세페이지 카피를 JSON으로 작성해주세요.`
+위 상품의 스마트스토어 베이커리 상세페이지 카피를 JSON으로 작성해주세요. 이미지가 여러 장인 경우 각 이미지의 내용을 파악하여 이미지 분류 지침에 따라 적절한 섹션에 배치하세요.`
 
     const parsed = await withKeyRotation(async (genAI, modelName) => {
       const model = genAI.getGenerativeModel({
