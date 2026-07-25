@@ -28,6 +28,22 @@ const EMPTY_RESULT: GenerateResult = {
 const wrapHtml = (inner: string) =>
   `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"></head><body style="margin:0">${inner}</body></html>`
 
+function esc(s: string) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+}
+
+function buildHtmlFromResult(result: GenerateResult): string {
+  const headlineHtml = esc(result.headline || "").replace(/\n/g, "<br>")
+  const features = (result.features || []).slice(0, 3)
+  const featureCols = features
+    .map(
+      (f) => `<div style="flex:1;padding:28px 16px;text-align:center;"><div style="font-size:22px;margin-bottom:10px;">✦</div><p style="font-weight:700;font-size:14px;color:#fff;margin:0;line-height:1.5;">${esc(f)}</p></div>`
+    )
+    .join(`<div style="width:1px;background:rgba(255,255,255,0.1);"></div>`)
+
+  return `<div style="max-width:860px;margin:0 auto;font-family:'Apple SD Gothic Neo','Noto Sans KR',sans-serif;"><div style="background:#fff;padding:60px 40px;text-align:center;border-bottom:1px solid #f0ebe5;"><h1 style="font-size:52px;font-weight:900;line-height:1.35;color:#1a0e00;margin:0 0 16px;">${headlineHtml}</h1></div><div style="background:#f9f5f0;padding:60px 40px;text-align:center;"><p style="font-size:16px;line-height:2;color:#4a3520;margin:0;white-space:pre-line;">${esc(result.intro || "")}</p></div>${features.length > 0 ? `<div style="display:flex;background:#3d2b1f;padding:36px 24px;">${featureCols}</div>` : ""}<div style="background:#fff;padding:48px 40px;"><p style="font-size:11px;font-weight:700;color:#b5835a;margin:0 0 14px;letter-spacing:3px;">재료 &amp; 원산지</p><p style="font-size:15px;color:#3d2b1f;line-height:1.9;margin:0;white-space:pre-line;">${esc(result.ingredients || "")}</p></div><div style="background:#f0ede8;padding:36px 40px;"><p style="font-size:11px;font-weight:700;color:#b5835a;margin:0 0 14px;letter-spacing:3px;">📦 보관 &amp; 배송</p><p style="font-size:15px;color:#3d2b1f;line-height:1.9;margin:0;white-space:pre-line;">${esc(result.storage || "")}</p></div><div style="background:#1a0e00;padding:60px 40px;text-align:center;"><p style="font-size:20px;font-weight:700;color:#fff;line-height:1.7;margin:0;white-space:pre-line;">${esc(result.cta || "")}</p></div></div>`
+}
+
 export default function HistoryTab() {
   const [pages, setPages] = useState<SavedPage[]>([])
   const [loading, setLoading] = useState(true)
@@ -38,6 +54,8 @@ export default function HistoryTab() {
   const [editingKey, setEditingKey] = useState<keyof GenerateResult | null>(null)
   const [editDraft, setEditDraft] = useState<string>("")
   const [saving, setSaving] = useState(false)
+  const [applying, setApplying] = useState(false)
+  const [applied, setApplied] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -114,6 +132,19 @@ export default function HistoryTab() {
     setEditDraft("")
   }
 
+  const handleApply = async () => {
+    if (!editingResult || !editingPage) return
+    setApplying(true)
+    const newHtml = buildHtmlFromResult(editingResult)
+    const updatedPage = { ...editingPage, html: newHtml }
+    setEditingPage(updatedPage)
+    setPages((prev) => prev.map((p) => p.id === editingPage.id ? updatedPage : p))
+    await supabase.from("generated_pages").update({ html: newHtml }).eq("id", editingPage.id)
+    setApplying(false)
+    setApplied(true)
+    setTimeout(() => setApplied(false), 2500)
+  }
+
   // ── 편집 뷰 ───────────────────────────────────────────────
 
   if (editingPage && editingResult) {
@@ -142,6 +173,25 @@ export default function HistoryTab() {
               </span>
             </div>
           </div>
+          <button
+            onClick={handleApply}
+            disabled={applying || !!editingKey}
+            style={{
+              flexShrink: 0, fontSize: 11, padding: "6px 12px", borderRadius: 8,
+              border: "none", fontWeight: 700, fontFamily: "inherit", cursor: applying || editingKey ? "not-allowed" : "pointer",
+              background: applied ? "rgba(134,239,172,0.85)" : applying ? "rgba(245,158,11,0.5)" : "#f59e0b",
+              color: applied ? "#064e3b" : "#1a0e00",
+              transition: "all 0.2s", display: "flex", alignItems: "center", gap: 4,
+            }}
+          >
+            {applying ? (
+              <><span className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5, borderTopColor: "#1a0e00", borderColor: "rgba(26,14,0,0.25)" }} />적용 중...</>
+            ) : applied ? (
+              <><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>적용됨</>
+            ) : (
+              <><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 11 12 14 22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" /></svg>HTML 적용</>
+            )}
+          </button>
           <button
             className="btn-ghost"
             style={{ padding: "6px 10px", fontSize: 11, flexShrink: 0 }}
