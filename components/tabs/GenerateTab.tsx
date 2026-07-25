@@ -42,6 +42,7 @@ export default function GenerateTab({ generating, setGenerating, result, setResu
   const [tone, setTone] = useState<Tone>("emotional")
   const [editingKey, setEditingKey] = useState<keyof GenerateResult | null>(null)
   const [editDraft, setEditDraft] = useState<string>("")
+  const [savedPageId, setSavedPageId] = useState<string | null>(null)
 
   useEffect(() => {
     let mounted = true
@@ -68,6 +69,7 @@ export default function GenerateTab({ generating, setGenerating, result, setResu
     setGenerating(true)
     setError(null)
     setResult(null)
+    setSavedPageId(null)
 
     try {
       const { data: patternData } = await supabase
@@ -93,12 +95,17 @@ export default function GenerateTab({ generating, setGenerating, result, setResu
 
       const generated: GenerateResult = await res.json()
       setResult(generated)
-      await supabase.from("generated_pages").insert({
-        product_name: selected.name,
-        tone,
-        result: generated,
-        html: generated.htmlFull,
-      })
+      const { data: insertData } = await supabase
+        .from("generated_pages")
+        .insert({
+          product_name: selected.name,
+          tone,
+          result: generated,
+          html: generated.htmlFull,
+        })
+        .select("id")
+        .single()
+      if (insertData) setSavedPageId(insertData.id)
     } catch (e) {
       if (e instanceof Error && e.name === "AbortError") return
       setError(e instanceof Error ? e.message : "오류 발생")
@@ -124,18 +131,17 @@ export default function GenerateTab({ generating, setGenerating, result, setResu
     setEditDraft(getSectionText(key))
   }
 
-  const saveEdit = (key: keyof GenerateResult) => {
+  const saveEdit = async (key: keyof GenerateResult) => {
     if (!result) return
-    if (key === "features") {
-      const arr = editDraft
-        .split("\n")
-        .map((l) => l.replace(/^\d+\.\s*/, "").trim())
-        .filter(Boolean)
-      setResult({ ...result, features: arr })
-    } else {
-      setResult({ ...result, [key]: editDraft })
-    }
+    const updatedResult: GenerateResult =
+      key === "features"
+        ? { ...result, features: editDraft.split("\n").map((l) => l.replace(/^\d+\.\s*/, "").trim()).filter(Boolean) }
+        : { ...result, [key]: editDraft }
+    setResult(updatedResult)
     setEditingKey(null)
+    if (savedPageId) {
+      await supabase.from("generated_pages").update({ result: updatedResult }).eq("id", savedPageId)
+    }
   }
 
   const cancelEdit = () => {
@@ -409,11 +415,11 @@ export default function GenerateTab({ generating, setGenerating, result, setResu
                   value={editDraft}
                   onChange={(e) => setEditDraft(e.target.value)}
                   autoFocus
-                  className="glass-input"
+                  className="glass-textarea"
                   style={{
-                    width: "100%", minHeight: key === "features" ? 100 : key === "headline" ? 72 : 80,
-                    resize: "vertical", fontSize: 13, lineHeight: 1.7,
-                    color: "rgba(255,245,235,0.9)", fontFamily: "inherit",
+                    minHeight: key === "features" ? 100 : key === "headline" ? 72 : 80,
+                    fontSize: 13,
+                    lineHeight: 1.7,
                   }}
                 />
               ) : key === "features" && Array.isArray(result.features) ? (
