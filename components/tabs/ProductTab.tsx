@@ -251,9 +251,10 @@ export default function ProductTab() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ products: selectedProducts, tone: mergeTone }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "생성 실패")
-      const result = data as GenerateResult
+      let data: Record<string, unknown> = {}
+      try { data = await res.json() } catch { throw new Error("서버 응답 오류. 다시 시도해주세요") }
+      if (!res.ok) throw new Error((data.error as string) || "생성 실패")
+      const result = data as unknown as GenerateResult
       setMergeResult(result)
       const names = selectedProducts.map((p) => p.name).join(" + ")
       await supabase.from("generated_pages").insert({

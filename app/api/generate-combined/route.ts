@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       if (imageParts.length >= 8) break
       const results = await Promise.allSettled(
         product.image_urls.slice(0, 2).map(async (url) => {
-          const res = await fetch(url)
+          const res = await fetch(url, { signal: AbortSignal.timeout(8000) })
           if (!res.ok) throw new Error(`fetch 실패: ${url}`)
           const buf = await res.arrayBuffer()
           const base64 = Buffer.from(buf).toString("base64")
